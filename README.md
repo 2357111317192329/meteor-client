@@ -1,4 +1,4 @@
-<h0 align="center">基於 Meteor Client 1.21.8 tag 修改版</h0>
+<h0 align="center">基於 Meteor Client 1.21.8 tag 的修改版</h0>
 <p>原 commit: https://github.com/MeteorDevelopment/meteor-client/commit/f8a7bfb1ca535b3bb8b9d81a99f3a38e8a2f888a </p>
 <p align="center">
 <img src="https://meteorclient.com/icon.png" alt="meteor-client-logo" width="15%"/>
