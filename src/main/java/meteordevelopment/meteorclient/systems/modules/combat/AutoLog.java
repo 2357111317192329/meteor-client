@@ -203,7 +203,7 @@ public class AutoLog extends Module {
 
         pops++;
         if (totemPops.get() > 0 && pops >= totemPops.get()) {
-            disconnect("Popped " + pops + " totems.");
+            disconnect("You were disconnected by Auto Logout because pops " + pops + " totems.\n\n");
             if (toggleOff.get()) this.toggle();
         }
     }

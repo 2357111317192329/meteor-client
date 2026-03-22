@@ -121,13 +121,23 @@ public enum SortPriority implements Comparator<Entity> {
 			else{
 				baseDamage=total;
 			}
+			if(living.isBaby()){
+				baseDamage*=1.1;
+			}
 		}
         else if(entity.getType() == EntityType.ELDER_GUARDIAN){
 			baseDamage=DamageUtils.calculateReductions(3.0f,mc.player,mc.world.getDamageSources().magic());
-			baseDamage=Math.max(baseDamage,(double) DamageUtils.calculateReductions(8.0f,mc.player,mc.world.getDamageSources().mobAttack((LivingEntity) entity)));
+			baseDamage=Math.max(baseDamage,(double) DamageUtils.calculateReductions(8.0f,mc.player,mc.world.getDamageSources().mobAttack(living)));
+			baseDamage*=1.1;
 		} 
-        else if(entity.getType() == EntityType.ENDER_DRAGON) baseDamage=18.0;
-        else if(entity.getType() == EntityType.EVOKER) baseDamage=9.0;
+        else if(entity.getType() == EntityType.ENDER_DRAGON){
+			baseDamage=DamageUtils.calculateReductions(6.0f,mc.player,mc.world.getDamageSources().magic());
+			baseDamage=Math.max(baseDamage,(double) DamageUtils.calculateReductions(10.0f,mc.player,mc.world.getDamageSources().mobAttack(living)));
+		}
+        else if(entity.getType() == EntityType.EVOKER){
+			baseDamage=DamageUtils.calculateReductions(6.0f,mc.player,mc.world.getDamageSources().indirectMagic(entity,entity));
+			baseDamage=Math.max(baseDamage,(double) DamageUtils.calculateReductions(9.0f,mc.player,mc.world.getDamageSources().mobAttack(living)));
+		}
         else if(entity.getType() == EntityType.GHAST) baseDamage=18.3;
         else if(entity.getType() == EntityType.GUARDIAN) baseDamage=6.0;
         else if(entity.getType() == EntityType.LLAMA) baseDamage=1.0;
