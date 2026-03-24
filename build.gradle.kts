@@ -2,8 +2,18 @@ plugins {
     id("fabric-loom") version "1.10-SNAPSHOT"
     id("maven-publish")
     id("com.gradleup.shadow") version "9.0.0-beta11"
+    java
 }
 
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+}
+
+tasks.withType<JavaCompile> {
+    options.release.set(21)
+}
 base {
     archivesName = properties["archives_base_name"] as String
     group = properties["maven_group"] as String
@@ -197,7 +207,6 @@ tasks {
         }
     }
 }
-
 publishing {
     publications {
         create<MavenPublication>("mavenJava") {

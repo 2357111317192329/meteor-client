@@ -18,6 +18,7 @@ import net.minecraft.entity.attribute.EntityAttribute;
 import net.minecraft.entity.attribute.EntityAttributeModifier;
 import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.attribute.EntityAttributeModifier.Operation;
+import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.mob.CreeperEntity;
 import net.minecraft.entity.Entity;
@@ -131,14 +132,18 @@ public enum SortPriority implements Comparator<Entity> {
 			baseDamage*=1.1;
 		} 
         else if(entity.getType() == EntityType.ENDER_DRAGON){
-			baseDamage=DamageUtils.calculateReductions(6.0f,mc.player,mc.world.getDamageSources().magic());
+			baseDamage=DamageUtils.calculateReductions(6.0f,mc.player,mc.world.getDamageSources().dragonBreath());
 			baseDamage=Math.max(baseDamage,(double) DamageUtils.calculateReductions(10.0f,mc.player,mc.world.getDamageSources().mobAttack(living)));
 		}
         else if(entity.getType() == EntityType.EVOKER){
 			baseDamage=DamageUtils.calculateReductions(6.0f,mc.player,mc.world.getDamageSources().indirectMagic(entity,entity));
 			baseDamage=Math.max(baseDamage,(double) DamageUtils.calculateReductions(9.0f,mc.player,mc.world.getDamageSources().mobAttack(living)));
 		}
-        else if(entity.getType() == EntityType.GHAST) baseDamage=18.3;
+        else if(entity.getType() == EntityType.GHAST){
+			DamageSource fireball = DamageUtils.createFireballDamageSource(mc.world,entity);
+			baseDamage=DamageUtils.calculateReductions(6.0f,mc.player,fireball);
+			baseDamage=Math.max(baseDamage,(double) DamageUtils.explosionDamage(mc.player, mc.player.getPos(),1.0f, false));
+		}
         else if(entity.getType() == EntityType.GUARDIAN) baseDamage=6.0;
         else if(entity.getType() == EntityType.LLAMA) baseDamage=1.0;
         else if(entity.getType() == EntityType.PILLAGER) baseDamage=5.0;

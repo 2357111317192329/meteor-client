@@ -18,6 +18,7 @@ import net.minecraft.component.type.AttributeModifiersComponent;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.Enchantments;
 import net.minecraft.entity.DamageUtil;
+import net.minecraft.entity.damage.DamageTypes;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.LivingEntity;
@@ -37,6 +38,7 @@ import net.minecraft.registry.tag.EntityTypeTags;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.HitResult;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
@@ -46,6 +48,11 @@ import net.minecraft.world.Heightmap;
 import net.minecraft.world.RaycastContext;
 import net.minecraft.world.explosion.Explosion;
 import org.jetbrains.annotations.Nullable;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.registry.Registry;
+import net.minecraft.registry.DynamicRegistryManager;
+import net.minecraft.entity.damage.DamageType;
+import net.minecraft.world.World;
 
 import java.util.function.BiFunction;
 
@@ -167,7 +174,19 @@ public class DamageUtils {
         float damage = modifyAttackDamage(attacker, target, attacker.getWeaponStack(), damageSource, itemDamage);
         return calculateReductions(damage, target, damageSource);
     }
-
+	private static RegistryEntry<DamageType> getFireballDamageType(World world) {
+        DynamicRegistryManager registryManager = world.getRegistryManager();
+        Registry<DamageType> damageTypeRegistry = registryManager.getOrThrow(RegistryKeys.DAMAGE_TYPE);
+        Identifier fireballId = DamageTypes.FIREBALL.getValue();
+        // 方式 2：直接使用 DamageTypes 的靜態方法（某些版本）
+        // return DamageTypes.FIREBALL.getEntry(); // 如果可用
+        
+        return damageTypeRegistry.getEntry(fireballId).orElseThrow();
+    }
+	public static DamageSource createFireballDamageSource(World world,Entity attacker) {
+		RegistryEntry<DamageType> damageType = getFireballDamageType(world);
+        return new DamageSource(damageType, attacker);
+    }
     public static float getAttackDamage(LivingEntity attacker, Entity target, ItemStack weapon) {
         EntityAttributeInstance original = attacker.getAttributeInstance(EntityAttributes.ATTACK_DAMAGE);
         EntityAttributeInstance copy = new EntityAttributeInstance(EntityAttributes.ATTACK_DAMAGE, o -> {});
