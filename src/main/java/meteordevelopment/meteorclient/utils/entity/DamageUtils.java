@@ -61,9 +61,8 @@ import static meteordevelopment.meteorclient.MeteorClient.mc;
 public class DamageUtils {
     private DamageUtils() {
     }
-
+	public record Vec4f(float x, float y, float z, float w) {}
     // Explosion damage
-
     /**
      * It is recommended to use this {@link RaycastFactory} unless you implement custom behaviour, as soon:tm: it will be the
      * target of optimizations to make it more performant.
@@ -177,10 +176,7 @@ public class DamageUtils {
 	private static RegistryEntry<DamageType> getFireballDamageType(World world) {
         DynamicRegistryManager registryManager = world.getRegistryManager();
         Registry<DamageType> damageTypeRegistry = registryManager.getOrThrow(RegistryKeys.DAMAGE_TYPE);
-        Identifier fireballId = DamageTypes.FIREBALL.getValue();
-        // 方式 2：直接使用 DamageTypes 的靜態方法（某些版本）
-        // return DamageTypes.FIREBALL.getEntry(); // 如果可用
-        
+        Identifier fireballId = DamageTypes.FIREBALL.getValue();    
         return damageTypeRegistry.getEntry(fireballId).orElseThrow();
     }
 	public static DamageSource createFireballDamageSource(World world,Entity attacker) {
@@ -301,6 +297,26 @@ public class DamageUtils {
                 case HARD     -> damage *= 1.5f;
             }
         }
+
+        if (entity instanceof LivingEntity livingEntity) { // Armor reduction
+            damage = DamageUtil.getDamageLeft(livingEntity, damage, damageSource, getArmor(livingEntity), (float) livingEntity.getAttributeValue(EntityAttributes.ARMOR_TOUGHNESS));
+            // Resistance reduction
+            damage = resistanceReduction(livingEntity, damage);
+
+            // Protection reduction
+            damage = protectionReduction(livingEntity, damage, damageSource);
+        }
+
+        return Math.max(damage, 0);
+    }
+	public static float calculateReductions(Vec4f damages, Entity entity, DamageSource damageSource) {
+		float damage=0;
+		switch (mc.world.getDifficulty()) {
+			case PEACEFUL     -> damage = damages.x;
+			case EASY     -> damage = damages.y;
+			case NORMAL     -> damage = damages.z;
+			case HARD     -> damage = damages.w;
+		}
 
         if (entity instanceof LivingEntity livingEntity) { // Armor reduction
             damage = DamageUtil.getDamageLeft(livingEntity, damage, damageSource, getArmor(livingEntity), (float) livingEntity.getAttributeValue(EntityAttributes.ARMOR_TOUGHNESS));
