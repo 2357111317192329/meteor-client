@@ -20,6 +20,7 @@ import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.attribute.EntityAttributeModifier.Operation;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.EquipmentSlot;
+import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.mob.CreeperEntity;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
@@ -109,7 +110,7 @@ public enum SortPriority implements Comparator<Entity> {
         else{
             total=DamageUtils.getAttackDamage(living,mc.player);
         }
-        double baseDamage;
+        double baseDamage=0;
         if(entity instanceof CreeperEntity creeper){
             Vec3d explosionPos = creeper.getPos();
             float power = creeper.isCharged() ? 6.0f : 3.0f;
@@ -140,8 +141,10 @@ public enum SortPriority implements Comparator<Entity> {
 			baseDamage=Math.max(baseDamage,(double) DamageUtils.calculateReductions(9.0f,mc.player,mc.world.getDamageSources().mobAttack(living)));
 		}
         else if(entity.getType() == EntityType.GHAST){
-			DamageSource fireball = DamageUtils.createFireballDamageSource(mc.world,entity);
-			baseDamage=DamageUtils.calculateReductions(6.0f,mc.player,fireball);
+			if(!mc.player.hasStatusEffect(StatusEffects.FIRE_RESISTANCE)){
+				DamageSource fireball = DamageUtils.createFireballDamageSource(mc.world,entity);
+			    baseDamage=DamageUtils.calculateReductions(6.0f,mc.player,fireball);
+			}
 			baseDamage=Math.max(baseDamage,(double) DamageUtils.explosionDamage(mc.player, mc.player.getPos(),1.0f, false));
 		}
         else if(entity.getType() == EntityType.GUARDIAN) baseDamage=6.0;
