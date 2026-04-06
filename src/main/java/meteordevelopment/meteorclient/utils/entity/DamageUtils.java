@@ -179,8 +179,18 @@ public class DamageUtils {
         Identifier fireballId = DamageTypes.FIREBALL.getValue();    
         return damageTypeRegistry.getEntry(fireballId).orElseThrow();
     }
+    private static RegistryEntry<DamageType> getArrowDamageType(World world) {
+        DynamicRegistryManager registryManager = world.getRegistryManager();
+        Registry<DamageType> damageTypeRegistry = registryManager.getOrThrow(RegistryKeys.DAMAGE_TYPE);
+        Identifier ArrowId = DamageTypes.ARROW.getValue();    
+        return damageTypeRegistry.getEntry(ArrowId).orElseThrow();
+    }
 	public static DamageSource createFireballDamageSource(World world,Entity attacker) {
 		RegistryEntry<DamageType> damageType = getFireballDamageType(world);
+        return new DamageSource(damageType, attacker);
+    }
+    public static DamageSource createArrowDamageSource(World world,Entity attacker) {
+		RegistryEntry<DamageType> damageType = getArrowDamageType(world);
         return new DamageSource(damageType, attacker);
     }
     public static float getAttackDamage(LivingEntity attacker, Entity target, ItemStack weapon) {

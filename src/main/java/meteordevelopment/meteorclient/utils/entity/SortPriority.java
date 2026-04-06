@@ -152,8 +152,18 @@ public enum SortPriority implements Comparator<Entity> {
 			baseDamage=DamageUtils.calculateReductions(damages,mc.player,mc.world.getDamageSources().magic());
 			baseDamage=Math.max(baseDamage,(double) DamageUtils.calculateReductions(6.0f,mc.player,mc.world.getDamageSources().mobAttack(living)));
 		}
-        else if(entity.getType() == EntityType.LLAMA) baseDamage=1.0;
-        else if(entity.getType() == EntityType.PILLAGER) baseDamage=5.0;
+        else if(entity.getType() == EntityType.LLAMA){
+            baseDamage=DamageUtils.calculateReductions(1.0f,mc.player,mc.world.getDamageSources().spit(entity,living));
+        }
+        else if(entity.getType() == EntityType.PILLAGER){
+            if(!mainHand.isEmpty() && mainHand.isOf(Items.CROSSBOW)){
+                DamageSource arrow = DamageUtils.createArrowDamageSource(mc.world,entity);
+				baseDamage=DamageUtils.calculateReductions(11.0f,mc.player,arrow);
+			}
+			else{
+				baseDamage=0.0;
+			}
+        }
         else if(entity.getType() == EntityType.PUFFERFISH) baseDamage=3.0;
         else if(entity.getType() == EntityType.SHULKER) baseDamage=4.0;
         else if(entity.getType() == EntityType.SKELETON) baseDamage=5.3;
