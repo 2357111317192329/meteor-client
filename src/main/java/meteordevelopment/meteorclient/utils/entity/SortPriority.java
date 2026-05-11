@@ -5,6 +5,7 @@
 
 package meteordevelopment.meteorclient.utils.entity;
 
+import meteordevelopment.meteorclient.utils.Utils;
 import meteordevelopment.meteorclient.utils.player.PlayerUtils;
 import meteordevelopment.meteorclient.utils.player.Rotations;
 import meteordevelopment.meteorclient.utils.player.ChatUtils;
@@ -13,6 +14,7 @@ import meteordevelopment.meteorclient.systems.modules.Module;
 import net.minecraft.component.type.AttributeModifiersComponent;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.AttributeModifierSlot;
+import net.minecraft.enchantment.Enchantments;
 import net.minecraft.entity.attribute.EntityAttributeInstance;
 import net.minecraft.entity.attribute.EntityAttribute;
 import net.minecraft.entity.attribute.EntityAttributeModifier;
@@ -113,12 +115,12 @@ public enum SortPriority implements Comparator<Entity> {
         double baseDamage=0;
         if(entity instanceof CreeperEntity creeper){
             Vec3d explosionPos = creeper.getPos();
-            float power = creeper.isCharged() ? 6.0f : 3.0f;
+            float power = creeper.isCharged() ? 6 : 3;
             baseDamage = DamageUtils.explosionDamage(mc.player, explosionPos, power, true);
         } 
         else if(entity.getType() == EntityType.DROWNED){
             if(!mainHand.isEmpty() && mainHand.isOf(Items.TRIDENT)){
-				baseDamage=DamageUtils.calculateReductions(8.0f,mc.player,mc.world.getDamageSources().trident(entity,entity));
+				baseDamage=DamageUtils.calculateReductions(8,mc.player,mc.world.getDamageSources().trident(entity,entity));
 			}
 			else{
 				baseDamage=total;
@@ -128,50 +130,170 @@ public enum SortPriority implements Comparator<Entity> {
 			}
 		}
         else if(entity.getType() == EntityType.ELDER_GUARDIAN){
-			baseDamage=DamageUtils.calculateReductions(3.0f,mc.player,mc.world.getDamageSources().magic());
-			baseDamage=Math.max(baseDamage,(double) DamageUtils.calculateReductions(8.0f,mc.player,mc.world.getDamageSources().mobAttack(living)));
+			baseDamage=DamageUtils.calculateReductions(3,mc.player,mc.world.getDamageSources().magic());
+			baseDamage=Math.max(baseDamage,(double) DamageUtils.calculateReductions(8,mc.player,mc.world.getDamageSources().mobAttack(living)));
 			baseDamage*=1.1;
 		} 
         else if(entity.getType() == EntityType.ENDER_DRAGON){
-			baseDamage=DamageUtils.calculateReductions(6.0f,mc.player,mc.world.getDamageSources().dragonBreath());
-			baseDamage=Math.max(baseDamage,(double) DamageUtils.calculateReductions(10.0f,mc.player,mc.world.getDamageSources().mobAttack(living)));
+			baseDamage=DamageUtils.calculateReductions(6,mc.player,mc.world.getDamageSources().dragonBreath());
+			baseDamage=Math.max(baseDamage,(double) DamageUtils.calculateReductions(10,mc.player,mc.world.getDamageSources().mobAttack(living)));
 		}
         else if(entity.getType() == EntityType.EVOKER){
-			baseDamage=DamageUtils.calculateReductions(6.0f,mc.player,mc.world.getDamageSources().indirectMagic(entity,entity));
-			baseDamage=Math.max(baseDamage,(double) DamageUtils.calculateReductions(9.0f,mc.player,mc.world.getDamageSources().mobAttack(living)));
+			baseDamage=DamageUtils.calculateReductions(6,mc.player,mc.world.getDamageSources().indirectMagic(entity,entity));
+			baseDamage=Math.max(baseDamage,(double) DamageUtils.calculateReductions(9,mc.player,mc.world.getDamageSources().mobAttack(living)));
 		}
         else if(entity.getType() == EntityType.GHAST){
 			if(!mc.player.hasStatusEffect(StatusEffects.FIRE_RESISTANCE)){
 				DamageSource fireball = DamageUtils.createFireballDamageSource(mc.world,entity);
-			    baseDamage=DamageUtils.calculateReductions(6.0f,mc.player,fireball);
+			    baseDamage=DamageUtils.calculateReductions(6,mc.player,fireball);
 			}
-			baseDamage=Math.max(baseDamage,(double) DamageUtils.explosionDamage(mc.player, mc.player.getPos(),1.0f, false));
+			baseDamage=Math.max(baseDamage,(double) DamageUtils.explosionDamage(mc.player, mc.player.getPos(),1, false));
 		}
         else if(entity.getType() == EntityType.GUARDIAN){
 			DamageUtils.Vec4f damages = new DamageUtils.Vec4f(0,1,1,4.5f);
 			baseDamage=DamageUtils.calculateReductions(damages,mc.player,mc.world.getDamageSources().magic());
-			baseDamage=Math.max(baseDamage,(double) DamageUtils.calculateReductions(6.0f,mc.player,mc.world.getDamageSources().mobAttack(living)));
+			baseDamage=Math.max(baseDamage,(double) DamageUtils.calculateReductions(6,mc.player,mc.world.getDamageSources().mobAttack(living)));
 		}
         else if(entity.getType() == EntityType.LLAMA){
-            baseDamage=DamageUtils.calculateReductions(1.0f,mc.player,mc.world.getDamageSources().spit(entity,living));
+            baseDamage=DamageUtils.calculateReductions(1,mc.player,mc.world.getDamageSources().spit(entity,living));
         }
         else if(entity.getType() == EntityType.PILLAGER){
             if(!mainHand.isEmpty() && mainHand.isOf(Items.CROSSBOW)){
                 DamageSource arrow = DamageUtils.createArrowDamageSource(mc.world,entity);
-				baseDamage=DamageUtils.calculateReductions(11.0f,mc.player,arrow);
+				baseDamage=DamageUtils.calculateReductions(11,mc.player,arrow);
 			}
 			else{
 				baseDamage=0.0;
 			}
         }
-        else if(entity.getType() == EntityType.PUFFERFISH) baseDamage=3.0;
-        else if(entity.getType() == EntityType.SHULKER) baseDamage=4.0;
-        else if(entity.getType() == EntityType.SKELETON) baseDamage=5.3;
-        else if(entity.getType() == EntityType.STRAY) baseDamage=5.3;
-        else if(entity.getType() == EntityType.VILLAGER) baseDamage=8.0;
-        else if(entity.getType() == EntityType.WITCH) baseDamage=24.0;
-        else if(entity.getType() == EntityType.WITHER_SKELETON) baseDamage=11.3;
-        else if(entity.getType() == EntityType.WITHER) baseDamage=41.7;
+        else if(entity.getType() == EntityType.PUFFERFISH){
+            baseDamage=DamageUtils.calculateReductions(3,mc.player,mc.world.getDamageSources().mobAttack(living));
+            baseDamage+=0.8;//poison 1
+            baseDamage*=1.1;//poison 
+        } 
+        else if(entity.getType() == EntityType.SHULKER){
+            baseDamage=DamageUtils.calculateReductions(4,mc.player,mc.world.getDamageSources().mobProjectile(entity,living));
+            baseDamage*=1.1;//levitation
+        }
+        else if(entity.getType() == EntityType.SKELETON){
+            if(!mainHand.isEmpty() && mainHand.isOf(Items.BOW)){
+                DamageUtils.Vec4f arrbase0 = new DamageUtils.Vec4f(0,2.11f,2.22f,2.33f);
+                int powerlevel = Utils.getEnchantmentLevel(mainHand, Enchantments.POWER);
+                DamageUtils.Vec4f arrbase1;
+                if(powerlevel>0){
+                    float increase = 0.5f*powerlevel+0.5f;
+                    DamageUtils.Vec4f incrvec = new DamageUtils.Vec4f(0,increase,increase,increase);
+                    arrbase1=arrbase0.add(incrvec);
+                }
+                else{
+                    arrbase1=arrbase0;
+                }
+                float arrspeed = 1.6f; // blocks per tick
+                DamageUtils.Vec4f arrowdamage = arrbase1.mul(arrspeed).ceil();
+                DamageSource arrow = DamageUtils.createArrowDamageSource(mc.world,entity);
+				baseDamage=DamageUtils.calculateReductions(arrowdamage,mc.player,arrow);
+                int flamelevel = Utils.getEnchantmentLevel(mainHand, Enchantments.FLAME);
+                if(mc.player.isTouchingWater() || mc.player.isTouchingWaterOrRain() || mc.player.hasStatusEffect(StatusEffects.FIRE_RESISTANCE)){
+                    flamelevel=0;
+                }
+                int knockbacklevel = Utils.getEnchantmentLevel(mainHand, Enchantments.KNOCKBACK);
+                if((flamelevel+knockbacklevel)>0){
+                    baseDamage*=1.1;
+                    //ChatUtils.info("special");
+                }
+			}
+			else{
+				baseDamage=total;
+			}
+        }
+        else if(entity.getType() == EntityType.STRAY){
+            if(!mainHand.isEmpty() && mainHand.isOf(Items.BOW)){
+                DamageUtils.Vec4f arrbase0 = new DamageUtils.Vec4f(0,2.11f,2.22f,2.33f);
+                int powerlevel = Utils.getEnchantmentLevel(mainHand, Enchantments.POWER);
+                DamageUtils.Vec4f arrbase1;
+                if(powerlevel>0){
+                    float increase = 0.5f*powerlevel+0.5f;
+                    DamageUtils.Vec4f incrvec = new DamageUtils.Vec4f(0,increase,increase,increase);
+                    arrbase1=arrbase0.add(incrvec);
+                }
+                else{
+                    arrbase1=arrbase0;
+                }
+                float arrspeed = 1.6f; // blocks per tick
+                DamageUtils.Vec4f arrowdamage = arrbase1.mul(arrspeed).ceil();
+                DamageSource arrow = DamageUtils.createArrowDamageSource(mc.world,entity);
+				baseDamage=DamageUtils.calculateReductions(arrowdamage,mc.player,arrow);
+                int flamelevel = Utils.getEnchantmentLevel(mainHand, Enchantments.FLAME);
+                if(mc.player.isTouchingWater() || mc.player.isTouchingWaterOrRain() || mc.player.hasStatusEffect(StatusEffects.FIRE_RESISTANCE)){
+                    flamelevel=0;
+                }
+                int knockbacklevel = Utils.getEnchantmentLevel(mainHand, Enchantments.KNOCKBACK);
+                if((flamelevel+knockbacklevel)>0){
+                    baseDamage*=1.1;
+                    //ChatUtils.info("special");
+                }
+                baseDamage*=1.1;//slowness
+			}
+			else{
+				baseDamage=total;
+			}
+        }
+        else if(entity.getType() == EntityType.BOGGED){
+            if(!mainHand.isEmpty() && mainHand.isOf(Items.BOW)){
+                DamageUtils.Vec4f arrbase0 = new DamageUtils.Vec4f(0,2.11f,2.22f,2.33f);
+                int powerlevel = Utils.getEnchantmentLevel(mainHand, Enchantments.POWER);
+                DamageUtils.Vec4f arrbase1;
+                if(powerlevel>0){
+                    float increase = 0.5f*powerlevel+0.5f;
+                    DamageUtils.Vec4f incrvec = new DamageUtils.Vec4f(0,increase,increase,increase);
+                    arrbase1=arrbase0.add(incrvec);
+                }
+                else{
+                    arrbase1=arrbase0;
+                }
+                float arrspeed = 1.6f; // blocks per tick
+                DamageUtils.Vec4f arrowdamage = arrbase1.mul(arrspeed).ceil();
+                DamageSource arrow = DamageUtils.createArrowDamageSource(mc.world,entity);
+				baseDamage=DamageUtils.calculateReductions(arrowdamage,mc.player,arrow);
+                int flamelevel = Utils.getEnchantmentLevel(mainHand, Enchantments.FLAME);
+                if(mc.player.isTouchingWater() || mc.player.isTouchingWaterOrRain() || mc.player.hasStatusEffect(StatusEffects.FIRE_RESISTANCE)){
+                    flamelevel=0;
+                }
+                int knockbacklevel = Utils.getEnchantmentLevel(mainHand, Enchantments.KNOCKBACK);
+                if((flamelevel+knockbacklevel)>0){
+                    baseDamage*=1.1;
+                    //ChatUtils.info("special");
+                }
+                baseDamage+=0.8;//poison 1
+                baseDamage*=1.1;//poison
+			}
+			else{
+				baseDamage=total;
+			}
+        }
+        else if(entity.getType() == EntityType.VILLAGER){
+            baseDamage=0.0;
+        }
+        else if(entity.getType() == EntityType.WITCH){
+            baseDamage=DamageUtils.calculateReductions(6,mc.player,mc.world.getDamageSources().magic());
+            baseDamage*=1.1;//slowness
+            baseDamage+=0.8;//poison 1
+            baseDamage*=1.1;//poison
+            baseDamage*=1.1;//weakness
+        }
+        else if(entity.getType() == EntityType.WITHER_SKELETON){
+            baseDamage=total;
+            baseDamage+=0.5;//wither 1
+            baseDamage*=1.1;//wither effect
+            baseDamage*=1.1;//black heart
+        }
+        else if(entity.getType() == EntityType.WITHER){
+			DamageSource witherSkull = DamageUtils.createwitherSkullDamageSource(mc.world,entity);
+			baseDamage=DamageUtils.calculateReductions(8,mc.player,witherSkull);
+			baseDamage=Math.max(baseDamage,(double) DamageUtils.explosionDamage(mc.player, mc.player.getPos(),1, false));
+            baseDamage+=1.0;//wither 2
+            baseDamage*=1.1;//wither effect
+        }
         else if(entity.getType() == EntityType.BEE) baseDamage=11.3;
         else if(entity.getType() == EntityType.AXOLOTL) baseDamage=0.0;
         else if(entity.getType() == EntityType.FOX) baseDamage=0.0;

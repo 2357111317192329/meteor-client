@@ -61,7 +61,35 @@ import static meteordevelopment.meteorclient.MeteorClient.mc;
 public class DamageUtils {
     private DamageUtils() {
     }
-	public record Vec4f(float x, float y, float z, float w) {}
+	public record Vec4f(float x, float y, float z, float w) {
+        // 向量加法
+        public Vec4f add(Vec4f other) {
+            return new Vec4f(
+                this.x + other.x,
+                this.y + other.y,
+                this.z + other.z,
+                this.w + other.w
+            );
+        }
+        // 係數乘法（scalar multiplication）
+        public Vec4f mul(float scalar) {
+            return new Vec4f(
+                this.x * scalar,
+                this.y * scalar,
+                this.z * scalar,
+                this.w * scalar
+            );
+        }
+        // 逐項向上取整
+        public Vec4f ceil() {
+            return new Vec4f(
+                (float) Math.ceil(this.x),
+                (float) Math.ceil(this.y),
+                (float) Math.ceil(this.z),
+                (float) Math.ceil(this.w)
+            );
+        }
+    }
     // Explosion damage
     /**
      * It is recommended to use this {@link RaycastFactory} unless you implement custom behaviour, as soon:tm: it will be the
@@ -185,12 +213,22 @@ public class DamageUtils {
         Identifier ArrowId = DamageTypes.ARROW.getValue();    
         return damageTypeRegistry.getEntry(ArrowId).orElseThrow();
     }
+    private static RegistryEntry<DamageType> getwitherSkullDamageType(World world) {
+        DynamicRegistryManager registryManager = world.getRegistryManager();
+        Registry<DamageType> damageTypeRegistry = registryManager.getOrThrow(RegistryKeys.DAMAGE_TYPE);
+        Identifier witherSkullId = DamageTypes.WITHER_SKULL.getValue();    
+        return damageTypeRegistry.getEntry(witherSkullId).orElseThrow();
+    }
 	public static DamageSource createFireballDamageSource(World world,Entity attacker) {
 		RegistryEntry<DamageType> damageType = getFireballDamageType(world);
         return new DamageSource(damageType, attacker);
     }
     public static DamageSource createArrowDamageSource(World world,Entity attacker) {
 		RegistryEntry<DamageType> damageType = getArrowDamageType(world);
+        return new DamageSource(damageType, attacker);
+    }
+    public static DamageSource createwitherSkullDamageSource(World world,Entity attacker) {
+		RegistryEntry<DamageType> damageType = getwitherSkullDamageType(world);
         return new DamageSource(damageType, attacker);
     }
     public static float getAttackDamage(LivingEntity attacker, Entity target, ItemStack weapon) {

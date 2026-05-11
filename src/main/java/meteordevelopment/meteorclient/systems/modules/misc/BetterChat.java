@@ -256,7 +256,11 @@ public class BetterChat extends Module {
     @EventHandler
     private void onMessageReceive(ReceiveMessageEvent event) {
         Text message = event.getMessage();
-
+        // 新增：若訊息本身為 null，直接取消事件以避免後續 NPE
+        if (message == null) {
+            event.cancel(); // 或直接 return，視你需求決定
+            return;
+        }
         if (filterRegex.get()) {
             String messageString = message.getString();
             for (Pattern pattern : filterRegexList) {
