@@ -716,6 +716,7 @@ public abstract class WTextBox extends WWidget {
         boolean wasJustFocused = focused && !this.focused;
 
         this.focused = focused;
+        mc.onTextInputFocusChange(mc.screen, focused);
 
         resetSelection();
 

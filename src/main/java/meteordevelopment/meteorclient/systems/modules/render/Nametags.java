@@ -430,10 +430,10 @@ public class Nametags extends Module {
 
         // Health
         float absorption = player.getAbsorptionAmount();
-        int health = Math.round(player.getHealth() + absorption);
+        float health = player.getHealth() + absorption;
         double healthPercentage = health / (player.getMaxHealth() + absorption);
 
-        String healthText = " " + health;
+        String healthText = " " + String.format("%.2f", health);
         Color healthColor;
 
         if (healthPercentage <= 0.333) healthColor = RED;
@@ -636,10 +636,10 @@ public class Nametags extends Module {
 
         //Health
         float absorption = entity.getAbsorptionAmount();
-        int health = Math.round(entity.getHealth() + absorption);
+        float health = entity.getHealth() + absorption;
         double healthPercentage = health / (entity.getMaxHealth() + absorption);
 
-        String healthText = String.valueOf(health);
+        String healthText = String.format("%.2f", health);
         Color healthColor;
 
         if (healthPercentage <= 0.333) healthColor = RED;

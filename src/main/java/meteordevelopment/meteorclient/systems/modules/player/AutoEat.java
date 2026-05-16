@@ -62,7 +62,7 @@ public class AutoEat extends Module {
     private final Setting<Boolean> pauseAuras = sgGeneral.add(new BoolSetting.Builder()
         .name("pause-auras")
         .description("Pauses all auras when eating.")
-        .defaultValue(true)
+        .defaultValue(false)
         .build()
     );
 
@@ -138,7 +138,10 @@ public class AutoEat extends Module {
     private void onTick(TickEvent.Pre event) {
         // Don't eat if AutoGap is already eating
         if (Modules.get().get(AutoGap.class).isEating()) return;
-
+        if (Modules.get().get(KillAura.class).attacking){
+            stopEating();
+            return;
+        }
         // case 1: Already eating
         if (eating) {
             // Stop eating if we shouldn't eat anymore
@@ -148,7 +151,7 @@ public class AutoEat extends Module {
             }
 
             // Check if the item in current slot is not food anymore
-            if (!Utils.isFood(mc.player.getInventory().getItem(slot))) {
+            if ((mc.player.getInventory().getItem(slot).get(DataComponents.FOOD) == null)||blacklist.get().contains(mc.player.getInventory().getItem(slot).getItem())) {
                 int newSlot = findSlot();
 
                 // Stop if no food found
@@ -209,6 +212,7 @@ public class AutoEat extends Module {
     }
 
     private void stopEating() {
+        if(!eating) return;
         if (prevSlot != SlotUtils.OFFHAND) changeSlot(prevSlot);
         setPressed(false);
 

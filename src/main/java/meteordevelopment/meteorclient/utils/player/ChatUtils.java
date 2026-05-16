@@ -93,6 +93,9 @@ public class ChatUtils {
     }
 
     // Default
+    public static void info(Object... args) {
+        info(args.toString());
+    }
 
     public static void info(String message, Object... args) {
         sendMsg(ChatFormatting.GRAY, message, args);

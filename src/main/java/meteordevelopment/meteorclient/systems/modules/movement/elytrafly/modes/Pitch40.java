@@ -6,6 +6,8 @@
 package meteordevelopment.meteorclient.systems.modules.movement.elytrafly.modes;
 
 import meteordevelopment.meteorclient.events.entity.player.PlayerMoveEvent;
+import meteordevelopment.meteorclient.systems.modules.combat.AutoLog;
+import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.meteorclient.systems.modules.movement.elytrafly.ElytraFlightMode;
 import meteordevelopment.meteorclient.systems.modules.movement.elytrafly.ElytraFlightModes;
 
@@ -19,6 +21,7 @@ public class Pitch40 extends ElytraFlightMode {
 
     @Override
     public void onActivate() {
+        super.onActivate();
         if (mc.player.getY() < elytraFly.pitch40upperBounds.get()) {
             elytraFly.error("Player must be above upper bounds!");
             elytraFly.toggle();
@@ -49,6 +52,16 @@ public class Pitch40 extends ElytraFlightMode {
         When descending, look at 37.72 deg
         When ascending, look up at -54.77 at 5.45 degree/tick, then lower at 0.90 deg/tick until at 37.72
          */
+        if(sctick>1){
+            AutoLog autolog = Modules.get().get(AutoLog.class);
+            autolog.disconnect("Y is lower than "+Math.ceil(elytraFly.bottomYtodisconnect.get())+" when Pitch40.\n");
+            elytraFly.toggle();
+            return;
+        }
+        if (Modules.get().get(AutoLog.class).isActive() && elytraFly.disconnectwhenlowY.get() && mc.player.getY() < elytraFly.bottomYtodisconnect.get()) {
+            mc.player.setXRot(-0.5F);
+            sctick=3;
+        }
 
         if (pitchingDown && mc.player.getY() <= elytraFly.pitch40lowerBounds.get()) {
             pitchingDown = false;
@@ -69,7 +82,9 @@ public class Pitch40 extends ElytraFlightMode {
             pitch += randPitch(elytraFly.pitch40rotationSpeedDown.get().floatValue(), 0.50F);
         }
 
-        mc.player.setXRot(pitch);
+        if(sctick==0){
+            mc.player.setXRot(pitch);
+        }
     }
 
     @Override

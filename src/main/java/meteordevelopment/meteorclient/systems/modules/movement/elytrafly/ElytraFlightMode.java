@@ -10,6 +10,7 @@ import meteordevelopment.meteorclient.events.packets.PacketEvent;
 import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.meteorclient.utils.player.FindItemResult;
 import meteordevelopment.meteorclient.utils.player.InvUtils;
+import meteordevelopment.meteorclient.systems.modules.combat.AutoLog;
 import meteordevelopment.meteorclient.utils.player.PlayerUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
@@ -28,10 +29,12 @@ public class ElytraFlightMode {
     protected boolean incrementJumpTimer;
     protected boolean lastForwardPressed;
     protected int jumpTimer;
+    protected int elytracount;
     protected double velX, velY, velZ;
     protected double ticksLeft;
     protected Vec3 forward, right;
     protected double acceleration;
+    protected int sctick=0;
 
     public ElytraFlightMode(ElytraFlightModes type) {
         this.elytraFly = Modules.get().get(ElytraFly.class);
@@ -52,13 +55,35 @@ public class ElytraFlightMode {
             ItemStack chestStack = mc.player.getItemBySlot(EquipmentSlot.CHEST);
 
             if (chestStack.getItem() == Items.ELYTRA) {
+                if(Modules.get().get(AutoLog.class).isActive() && elytraFly.disconnectwhenlackelytra.get()){
+                    if(sctick==1){
+                        AutoLog autolog = Modules.get().get(AutoLog.class);
+                        autolog.disconnect("No more elytra to replace.\n");
+                        elytraFly.toggle();
+                        return;
+                    }
+                    if(chestStack.getMaxDamage() - chestStack.getDamageValue()==elytraFly.lastelytraDurability.get()){
+                        elytracount=leftelytracount();
+                    }
+                    if(elytracount<=1 && chestStack.getMaxDamage() - chestStack.getDamageValue()<=elytraFly.lastelytraDurability.get()){
+                        mc.player.setXRot(-0.5F);
+                        sctick=Math.max(2,sctick);
+                    }
+                }
                 if (chestStack.getMaxDamage() - chestStack.getDamageValue() <= elytraFly.replaceDurability.get()) {
                     FindItemResult elytra = InvUtils.find(stack -> stack.getMaxDamage() - stack.getDamageValue() > elytraFly.replaceDurability.get() && stack.getItem() == Items.ELYTRA);
-
                     InvUtils.move().from(elytra.slot()).toArmor(2);
+                    elytracount=leftelytracount();
                 }
             }
         }
+        if(sctick>0){
+            sctick--;
+        }
+    }
+    public int leftelytracount() {
+        FindItemResult elytra = InvUtils.find(stack -> stack.getMaxDamage() - stack.getDamageValue() > elytraFly.replaceDurability.get() && stack.getItem() == Items.ELYTRA);
+        return elytra.count();
     }
 
     public void onPreTick() {
@@ -78,6 +103,8 @@ public class ElytraFlightMode {
         jumpTimer = 0;
         ticksLeft = 0;
         acceleration = 0;
+        elytracount=leftelytracount();
+        //elytraFly.info("elytracount:"+elytracount);
     }
 
     public void onDeactivate() {

@@ -11,6 +11,7 @@ import meteordevelopment.meteorclient.systems.modules.Categories;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.utils.entity.DamageUtils;
 import meteordevelopment.meteorclient.utils.player.InvUtils;
+import meteordevelopment.meteorclient.utils.player.PlayerUtils;
 import meteordevelopment.orbit.EventHandler;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.world.entity.LivingEntity;
@@ -53,12 +54,16 @@ public class AutoWeapon extends Module {
     }
 
     private int getBestWeapon(LivingEntity target) {
+        double dist = PlayerUtils.closestdistanceTo(target);
         int slotS = mc.player.getInventory().getSelectedSlot();
         int slotA = mc.player.getInventory().getSelectedSlot();
+        int slotSP = mc.player.getInventory().getSelectedSlot();
         double damageS = 0;
         double damageA = 0;
+        double damageSP = 0;
         double currentDamageS;
         double currentDamageA;
+        double currentDamageSP;
         for (int i = 0; i < 9; i++) {
             ItemStack stack = mc.player.getInventory().getItem(i);
             if (stack.is(ItemTags.SWORDS)
@@ -76,6 +81,17 @@ public class AutoWeapon extends Module {
                     slotA = i;
                 }
             }
+            else if (stack.is(ItemTags.SPEARS)
+                && (!antiBreak.get() || (stack.getMaxDamage() - stack.getDamageValue()) > 10)) {
+                currentDamageSP = DamageUtils.getAttackDamage(mc.player, target, stack);
+                if (currentDamageSP > damageSP) {
+                    damageSP = currentDamageSP;
+                    slotSP = i;
+                }
+            }
+        }
+        if(dist > mc.player.entityInteractionRange()){
+            return slotSP;
         }
         if (weapon.get() == Weapon.Sword && threshold.get() > damageA - damageS) return slotS;
         else if (weapon.get() == Weapon.Axe && threshold.get() > damageS - damageA) return slotA;

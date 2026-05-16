@@ -23,6 +23,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
 import net.minecraft.util.Mth;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.attribute.EnvironmentAttributes;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
@@ -237,7 +238,33 @@ public class PlayerUtils {
     public static double distance(double x1, double y1, double z1, double x2, double y2, double z2) {
         return Math.sqrt(squaredDistance(x1, y1, z1, x2, y2, z2));
     }
-
+    public static Vec3 closestPointTo(Entity entity) {
+        return closestPointTo(entity,false);
+    }
+    public static Vec3 closestPointTo(Entity entity, boolean predictMovement) {
+        Vec3 eyePos = mc.player.getEyePosition();
+        AABB box = entity.getBoundingBox();
+        if(predictMovement){
+            eyePos = eyePos.add(mc.player.getDeltaMovement());
+            box = box.move(entity.getDeltaMovement());
+        }
+        double closestX = Mth.clamp(eyePos.x, box.minX, box.maxX);
+        double closestY = Mth.clamp(eyePos.y, box.minY, box.maxY);
+        double closestZ = Mth.clamp(eyePos.z, box.minZ, box.maxZ);
+        Vec3 closestPoint = new Vec3(closestX, closestY, closestZ);
+        return closestPoint;
+    }
+    public static double closestdistanceTo(Entity entity) {
+        return closestdistanceTo(entity,false);
+    }
+    public static double closestdistanceTo(Entity entity,boolean predictMovement) {
+        Vec3 eyePos = mc.player.getEyePosition();
+        Vec3 closestPoint = closestPointTo(entity,predictMovement);
+        if(predictMovement){
+            eyePos = eyePos.add(mc.player.getDeltaMovement());
+        }
+        return Math.sqrt(squaredDistance(eyePos.x, eyePos.y, eyePos.z,closestPoint.x,closestPoint.y,closestPoint.z));
+    }
     public static double distanceTo(Entity entity) {
         return distanceTo(entity.getX(), entity.getY(), entity.getZ());
     }
@@ -323,7 +350,7 @@ public class PlayerUtils {
     }
 
     public static boolean isWithinReach(Entity entity) {
-        return isWithinReach(entity.getX(), entity.getY(), entity.getZ());
+        return closestdistanceTo(entity) <= mc.player.entityInteractionRange();
     }
 
     public static boolean isWithinReach(Vec3 vec3d) {

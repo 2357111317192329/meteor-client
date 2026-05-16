@@ -160,7 +160,22 @@ public class ElytraFly extends Module {
         .visible(() -> flightMode.get() != ElytraFlightModes.Bounce)
         .build()
     );
-
+    public final Setting<Boolean> disconnectwhenlowY = sgGeneral.add(new BoolSetting.Builder()
+        .name("disconnect-when-lowY")
+        .description("Auto logout when Y is too low.(AutoLog is required)")
+        .defaultValue(false)
+        .visible(() -> flightMode.get() == ElytraFlightModes.Pitch40)
+        .build()
+    );
+    public final Setting<Double> bottomYtodisconnect = sgGeneral.add(new DoubleSetting.Builder()
+        .name("bottom-Y-to-disconnect")
+        .description("The bottom height to disconnect.")
+        .defaultValue(267)
+        .min(-64)
+        .sliderMax(331)
+        .visible(disconnectwhenlowY::get)
+        .build()
+    );
     public final Setting<Double> pitch40lowerBounds = sgGeneral.add(new DoubleSetting.Builder()
         .name("pitch40-lower-bounds")
         .description(
@@ -297,9 +312,25 @@ public class ElytraFly extends Module {
     public final Setting<Integer> replaceDurability = sgInventory.add(new IntSetting.Builder()
         .name("replace-durability")
         .description("The durability threshold your elytra will be replaced at.")
-        .defaultValue(2)
-        .sliderRange(1, 500)
+        .defaultValue(24)
+        .sliderRange(1, 432)
         .visible(replace::get)
+        .build()
+    );
+    public final Setting<Boolean> disconnectwhenlackelytra = sgInventory.add(new BoolSetting.Builder()
+        .name("disconnect-when-lack-elytra")
+        .description("Auto logout when No elytra to replace.(AutoLog is required)")
+        .defaultValue(false)
+        .visible(replace::get)
+        .build()
+    );
+    public final Setting<Integer> lastelytraDurability = sgInventory.add(new IntSetting.Builder()
+        .name("last-elytra-durability")
+        .description("The durability threshold for last elytra before AutoLog.")
+        .defaultValue(100)
+        .range(2, 432)
+        .sliderRange(1, 432)
+        .visible(disconnectwhenlackelytra::get)
         .build()
     );
 

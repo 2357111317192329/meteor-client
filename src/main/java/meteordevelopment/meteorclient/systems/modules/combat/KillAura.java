@@ -15,6 +15,7 @@ import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.meteorclient.utils.entity.EntityUtils;
 import meteordevelopment.meteorclient.utils.entity.SortPriority;
+import meteordevelopment.meteorclient.utils.entity.DamageUtils;
 import meteordevelopment.meteorclient.utils.entity.Target;
 import meteordevelopment.meteorclient.utils.entity.TargetUtils;
 import meteordevelopment.meteorclient.utils.entity.fakeplayer.FakePlayerEntity;
@@ -27,7 +28,7 @@ import meteordevelopment.orbit.EventHandler;
 import net.minecraft.network.protocol.game.ServerboundSetCarriedItemPacket;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.util.Mth;
-import net.minecraft.world.InteractionHand;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.animal.frog.Frog;
 import net.minecraft.world.entity.animal.parrot.Parrot;
@@ -39,10 +40,16 @@ import net.minecraft.world.entity.monster.piglin.Piglin;
 import net.minecraft.world.entity.monster.zombie.Zombie;
 import net.minecraft.world.entity.monster.zombie.ZombifiedPiglin;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.*;
+import net.minecraft.world.item.component.PiercingWeapon;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.phys.AABB;
-
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.Level;
+import java.util.Optional;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -74,6 +81,31 @@ public class KillAura extends Module {
         .name("rotate")
         .description("Determines when you should rotate towards the target.")
         .defaultValue(RotationMode.Always)
+        .build()
+    );
+    private final Setting<Boolean> rotateback = sgGeneral.add(new BoolSetting.Builder()
+        .name("rotate-back")
+        .description("wether to rotate back after certain ticks")
+        .defaultValue(true)
+        .visible(() -> ((rotation.get() == RotationMode.Always) || (rotation.get() == RotationMode.OnHit)))
+        .build()
+    );
+    private final Setting<Integer> rotatebackticks = sgGeneral.add(new IntSetting.Builder()
+        .name("rotate-back-ticks")
+        .description("How ticks to rotate back after roatate")
+        .defaultValue(1)
+        .min(0)
+        .sliderRange(0, 20)
+        .visible(rotateback::get)
+        .build()
+    );
+    private final Setting<Integer> rotateDelay = sgGeneral.add(new IntSetting.Builder()
+        .name("rotatet-delay")
+        .description("How many ticks should you wait to hit the entity after rotate")
+        .defaultValue(1)
+        .min(0)
+        .sliderMax(6)
+        .visible(() -> ((rotation.get() == RotationMode.Always) || (rotation.get() == RotationMode.OnHit)))
         .build()
     );
 
@@ -110,11 +142,10 @@ public class KillAura extends Module {
         .defaultValue(false)
         .build()
     );
-
-    private final Setting<Boolean> onlyOnLook = sgGeneral.add(new BoolSetting.Builder()
-        .name("only-on-look")
-        .description("Only attacks when looking at an entity.")
-        .defaultValue(false)
+    private final Setting<AnticheatMode> anticheat = sgGeneral.add(new EnumSetting.Builder<AnticheatMode>()
+        .name("anti-cheat-type")
+        .description("anti-cheat type")
+        .defaultValue(AnticheatMode.MODE_3C3U)
         .build()
     );
 
@@ -148,25 +179,22 @@ public class KillAura extends Module {
         .defaultValue(1)
         .min(1)
         .sliderRange(1, 5)
-        .visible(() -> !onlyOnLook.get())
+        .build()
+    );
+    private final Setting<Boolean> custumrange = sgTargeting.add(new BoolSetting.Builder()
+        .name("custum-range")
+        .description("Use custum range instead of player's interaction range.")
+        .defaultValue(false)
         .build()
     );
 
     private final Setting<Double> range = sgTargeting.add(new DoubleSetting.Builder()
         .name("range")
         .description("The maximum range the entity can be to attack it.")
-        .defaultValue(4.5)
+        .defaultValue(3.0)
         .min(0)
         .sliderMax(6)
-        .build()
-    );
-
-    private final Setting<Double> wallsRange = sgTargeting.add(new DoubleSetting.Builder()
-        .name("walls-range")
-        .description("The maximum range the entity can be attacked through walls.")
-        .defaultValue(3.5)
-        .min(0)
-        .sliderMax(6)
+        .visible(custumrange::get)
         .build()
     );
 
@@ -265,8 +293,15 @@ public class KillAura extends Module {
     private final List<Entity> targets = new ArrayList<>();
     private int switchTimer, hitTimer;
     private boolean wasPathing = false;
+    public boolean roatating = false,waithit = false;
     public boolean attacking, swapped;
+    public boolean usingspear = false;
+    public boolean shouldusespear = false;
     public static int previousSlot;
+    private long time=0,next_rotate=0;
+    private float preYaw=0,prePitch=0;
+    private int rbtickleft=0,rdtickleft=0;
+    private Entity tmptarget;
 
     public KillAura() {
         super(Categories.Combat, "kill-aura", "Attacks specified entities around you.");
@@ -283,7 +318,51 @@ public class KillAura extends Module {
         targets.clear();
         stopAttacking();
     }
+    private boolean EntityInSight(Entity target) {
+        if (!entityCheck(target)) return false;
+        Player player = mc.player;
+        if (player == null) return false;
+        double reach = (custumrange.get()) ? range.get() : player.entityInteractionRange();
+        if (usingspear){
+            reach = (custumrange.get()) ? range.get() : 4.5;
+        }
+        Vec3 eyePos = player.getEyePosition();
+        Vec3 lookVec = player.getViewVector(1.0F);
+        Vec3 endPos = eyePos.add(lookVec.scale(reach));
 
+        Optional<Vec3> hit = target.getBoundingBox().clip(eyePos, endPos);
+        return hit.isPresent();
+    }
+    @EventHandler
+    private void onTick(TickEvent.Post event){
+        if(rdtickleft<=0 && waithit){
+            if(tmptarget!=null){
+                //info("attack");
+                attack(tmptarget);
+            }
+            waithit=false;
+        }
+        if(rbtickleft<=0 && roatating){
+            Realrotate(mc.player.getYRot(),mc.player.getXRot());
+        }
+        ItemStack mainHand = mc.player.getItemBySlot(EquipmentSlot.MAINHAND);
+        if(!mainHand.isEmpty() && mainHand.has(DataComponents.PIERCING_WEAPON)){
+            usingspear = true;
+        }
+        else{
+            usingspear = false;
+        }
+        time++;
+        if(rbtickleft>0){
+            //info("rbtickleft="+rbtickleft);
+            rbtickleft--;
+        }
+        if(rdtickleft>0){
+            //info("rdtickleft="+rdtickleft);
+            rdtickleft--;
+        }
+        
+    }
     @EventHandler
     private void onTick(TickEvent.Pre event) {
         if (!mc.player.isAlive() || PlayerUtils.getGameMode() == GameType.SPECTATOR) {
@@ -306,7 +385,7 @@ public class KillAura extends Module {
             stopAttacking();
             return;
         }
-        if (onlyOnLook.get()) {
+        if (anticheat.get() == AnticheatMode.MODE_onlyOnLook) {
             Entity targeted = mc.crosshairPickEntity;
 
             if (targeted == null || !entityCheck(targeted)) {
@@ -327,12 +406,43 @@ public class KillAura extends Module {
         }
 
         Entity primary = targets.getFirst();
+        //info(primary.getName().getString());
+        double dist = PlayerUtils.closestdistanceTo(primary);
+        //info(primary.getName().getString()+Double.toString(dist)+"格");
+        if(dist > mc.player.entityInteractionRange()){
+            shouldusespear=true;
+        }
+        else{
+            usingspear=false;
+            shouldusespear=false;
+            swapwep(primary);
+        }
+        double upcomedam = SortPriority.getAttackDamage(primary);
+        //info(primary.getName().getString()+Double.toString(dist)+"格"+" "+"傷害"+Double.toString(upcomedam));
 
         if (autoSwitch.get()) {
-            FindItemResult weaponResult = new FindItemResult(mc.player.getInventory().getSelectedSlot(), -1);
-            if (attackWhenHolding.get() == AttackItems.Weapons)
-                weaponResult = InvUtils.find(this::acceptableWeapon, 0, 8);
+            swapwep(primary);
+        }
 
+        if (!acceptableWeapon(mc.player.getMainHandItem())) {
+            stopAttacking();
+            return;
+        }
+
+        attacking = true;
+        Vec3 closestPoint=PlayerUtils.closestPointTo(primary);
+        if (rotation.get() == RotationMode.Always)
+            Realrotate((float)Rotations.getYaw(closestPoint),(float)Rotations.getPitch(closestPoint));
+        if (pauseOnCombat.get() && PathManagers.get().isPathing() && !wasPathing) {
+            PathManagers.get().pause();
+            wasPathing = true;
+        }
+        targets.stream().filter(this::entityCheck).filter(this::delayCheck).forEach(this::attack);
+    }
+    private void swapwep(Entity target){
+        FindItemResult weaponResult = new FindItemResult(mc.player.getInventory().getSelectedSlot(), -1);
+        if (attackWhenHolding.get() == AttackItems.Weapons){
+            weaponResult = InvUtils.find(this::acceptableWeapon, 0, 8);
             if (shouldShieldBreak()) {
                 FindItemResult axeResult = InvUtils.find(itemStack -> itemStack.getItem() instanceof AxeItem, 0, 8);
                 if (axeResult.found()) weaponResult = axeResult;
@@ -342,24 +452,57 @@ public class KillAura extends Module {
                 previousSlot = mc.player.getInventory().getSelectedSlot();
                 swapped = true;
             }
-
             InvUtils.swap(weaponResult.slot(), false);
         }
-
-        if (!acceptableWeapon(mc.player.getMainHandItem())) {
-            stopAttacking();
-            return;
+        else{
+            int slot = mc.player.getInventory().getSelectedSlot();
+            double tmpdamage = 0;
+            double currentDamage = 0;
+            for (int i = 0; i < 9; i++) {
+                ItemStack stack = mc.player.getInventory().getItem(i);
+                if(shouldusespear){
+                    PiercingWeapon piercing = stack.get(DataComponents.PIERCING_WEAPON);
+                    if (piercing == null) {
+                        continue;
+                    }
+                }
+                if ((stack.getMaxDamage() - stack.getDamageValue()) > 10){
+                    currentDamage = DamageUtils.getAttackDamage(mc.player, target, stack);
+                }
+                if (currentDamage > tmpdamage) {
+                    tmpdamage = currentDamage;
+                    slot = i;
+                }
+            }
+            InvUtils.swap(slot, false);
         }
-
-        attacking = true;
-        if (rotation.get() == RotationMode.Always)
-            Rotations.rotate(Rotations.getYaw(primary), Rotations.getPitch(primary, Target.Body));
-        if (pauseOnCombat.get() && PathManagers.get().isPathing() && !wasPathing) {
-            PathManagers.get().pause();
-            wasPathing = true;
+        
+    }
+    private void Realrotate(float yaw,float pitch) {
+        if(roatating){
+            mc.player.setYRot(preYaw);
+            mc.player.setXRot(prePitch);
+            roatating = false;
         }
-
-        if (delayCheck()) targets.forEach(this::attack);
+        else{
+            if(time>=next_rotate){
+                preYaw = mc.player.getYRot();
+                prePitch = mc.player.getXRot();
+                mc.player.setYRot(yaw);
+                mc.player.setXRot(pitch);
+                rdtickleft=rotateDelay.get();
+                //info("roatating");
+                //Rotations.rotate(yaw, pitch, 0, true, null);
+                if(rotateback.get()){
+                    roatating = true;
+                    rbtickleft=rotatebackticks.get();
+                }
+                next_rotate=time+1;
+            }
+            else{
+                //info(Long.toString(next_rotate-time)+"ticks left to roatate");
+            }
+        }
     }
 
     @EventHandler
@@ -396,21 +539,32 @@ public class KillAura extends Module {
     }
 
     private boolean entityCheck(Entity entity) {
-        if (entity.equals(mc.player) || entity.equals(mc.getCameraEntity())) return false;
+        Player player = mc.player;
+        if (entity.equals(player) || entity.equals(mc.getCameraEntity())) return false;
         if ((entity instanceof LivingEntity livingEntity && livingEntity.isDeadOrDying()) || !entity.isAlive())
             return false;
-
-        AABB hitbox = entity.getBoundingBox();
-        if (!PlayerUtils.isWithin(
-            Mth.clamp(mc.player.getX(), hitbox.minX, hitbox.maxX),
-            Mth.clamp(mc.player.getY(), hitbox.minY, hitbox.maxY),
-            Mth.clamp(mc.player.getZ(), hitbox.minZ, hitbox.maxZ),
-            range.get()
-        )) return false;
-
+        double reach = (custumrange.get()) ? range.get() : player.entityInteractionRange();
+        if (usingspear){
+            reach = (custumrange.get()) ? range.get() : 4.5;
+            Vec3 eye = player.getEyePosition();
+            Vec3 closest = PlayerUtils.closestPointTo(entity,false);
+            HitResult hit = mc.level.clip(new ClipContext(
+                eye,
+                closest,
+                ClipContext.Block.COLLIDER,
+                ClipContext.Fluid.NONE,
+                player
+            ));
+            if (hit.getType() == HitResult.Type.BLOCK) return false;
+        }
+        double dist = PlayerUtils.closestdistanceTo(entity);
+        if (dist > reach) {
+            return false; 
+        }
+        //info(entity.getName().getString()+Double.toString(dist)+"格");
+        
         if (!entities.get().contains(entity.getType())) return false;
         if (ignoreNamed.get() && entity.hasCustomName()) return false;
-        if (!PlayerUtils.canSeeEntity(entity) && !PlayerUtils.isWithin(entity, wallsRange.get())) return false;
         if (ignoreTamed.get()) {
             if (entity instanceof OwnableEntity tameable
                 && tameable.getOwner() != null
@@ -422,11 +576,11 @@ public class KillAura extends Module {
             if ((entity instanceof Piglin || entity instanceof ZombifiedPiglin || entity instanceof Wolf) && !((Mob) entity).isAggressive())
                 return false;
         }
-        if (entity instanceof Player player) {
-            if (player.isCreative()) return false;
-            if (!Friends.get().shouldAttack(player)) return false;
-            if (shieldMode.get() == ShieldMode.Ignore && player.isBlocking()) return false;
-            if (player instanceof FakePlayerEntity fakePlayer && fakePlayer.noHit) return false;
+        if (entity instanceof Player otherplayer) {
+            if (otherplayer.isCreative()) return false;
+            if (!Friends.get().shouldAttack(otherplayer)) return false;
+            if (shieldMode.get() == ShieldMode.Ignore && otherplayer.isBlocking()) return false;
+            if (otherplayer instanceof FakePlayerEntity fakePlayer && fakePlayer.noHit) return false;
         }
         if (entity instanceof LivingEntity livingEntity) {
             // Hostile mobs with baby variants (zombies, piglins, hoglins, zoglins)
@@ -447,10 +601,20 @@ public class KillAura extends Module {
                 };
             }
         }
+        if (usingspear && dist<=2){
+            usingspear=false;
+            shouldusespear=false;
+            info("do not use spear");
+            swapwep(entity);
+            return false;
+        }
         return true;
     }
 
-    private boolean delayCheck() {
+    private boolean delayCheck(Entity target) {
+        if (!target.isAttackable()) {
+            return false;
+        }
         if (switchTimer > 0) {
             switchTimer--;
             return false;
@@ -458,26 +622,101 @@ public class KillAura extends Module {
 
         float delay = (customDelay.get()) ? hitDelay.get() : 0.5f;
         if (tpsSync.get()) delay /= (TickRate.INSTANCE.getTickRate() / 20);
-
+        boolean playerReady;
         if (customDelay.get()) {
             if (hitTimer < delay) {
                 hitTimer++;
-                return false;
-            } else return true;
-        } else return mc.player.getAttackStrengthScale(delay) >= 1;
+                playerReady = false;
+            } else playerReady = true;
+        } else playerReady = mc.player.getAttackStrengthScale(delay) >= 1;
+        if (target instanceof LivingEntity living) {
+            boolean targetReady = living.hurtTime == 0;
+            return playerReady && targetReady;
+        }
+        return playerReady;
     }
 
     private void attack(Entity target) {
-        if (rotation.get() == RotationMode.OnHit)
-            Rotations.rotate(Rotations.getYaw(target), Rotations.getPitch(target, Target.Body));
-
-        mc.gameMode.attack(mc.player, target);
-        mc.player.swing(InteractionHand.MAIN_HAND);
-
+        if(waithit){
+            if(usingspear){
+                //info("dist="+PlayerUtils.closestdistanceTo(target));
+                ItemStack stack = mc.player.getMainHandItem();
+                PiercingWeapon piercing = stack.get(DataComponents.PIERCING_WEAPON);
+                if (piercing != null) {
+                    mc.gameMode.piercingAttack(piercing);
+                    mc.player.swing(InteractionHand.MAIN_HAND);
+                }
+            }
+            else{
+                if(EntityInSight(target)){
+                    //info("dist="+PlayerUtils.closestdistanceTo(target));
+                    mc.gameMode.attack(mc.player, target);
+                    mc.player.swing(InteractionHand.MAIN_HAND);
+                }
+            }
+            waithit=false;
+            return;
+        }
+        if (anticheat.get() == AnticheatMode.MODE_onlyOnLook || anticheat.get() == AnticheatMode.MODE_3C3U){
+            if (!EntityInSight(target)){
+                Vec3 closestPoint=PlayerUtils.closestPointTo(target);
+                Realrotate((float)Rotations.getYaw(closestPoint),(float)Rotations.getPitch(closestPoint));
+            }
+            if(rdtickleft<=0){
+                if(usingspear){
+                    //info("dist="+PlayerUtils.closestdistanceTo(target));
+                    ItemStack stack = mc.player.getMainHandItem();
+                    PiercingWeapon piercing = stack.get(DataComponents.PIERCING_WEAPON);
+                    if (piercing != null) {
+                        mc.gameMode.piercingAttack(piercing);
+                        mc.player.swing(InteractionHand.MAIN_HAND);
+                    }
+                }
+                else{
+                    if(EntityInSight(target)){
+                        //info("dist="+PlayerUtils.closestdistanceTo(target));
+                        mc.gameMode.attack(mc.player, target);
+                        mc.player.swing(InteractionHand.MAIN_HAND);
+                    }
+                }
+                waithit=false;
+            }
+            else{
+                tmptarget=target;
+                waithit=true;
+            }
+        }
+        else{
+            if(!usingspear){
+                mc.gameMode.attack(mc.player, target);
+                mc.player.swing(InteractionHand.MAIN_HAND);
+            }
+            else{
+                ItemStack stack = mc.player.getMainHandItem();
+                PiercingWeapon piercing = stack.get(DataComponents.PIERCING_WEAPON);
+                if (piercing != null) {
+                    mc.gameMode.piercingAttack(piercing);
+                    mc.player.swing(InteractionHand.MAIN_HAND);
+                }
+            }
+            waithit=false;
+        }
+        
+        
         hitTimer = 0;
+        shouldusespear=false;
     }
 
     private boolean acceptableWeapon(ItemStack stack) {
+        if (shouldusespear){
+            //info("use spear");
+            return (weapons.get().contains(Items.DIAMOND_SPEAR) && stack.is(ItemTags.SPEARS));
+        }
+        else{
+            if(stack.is(ItemTags.SPEARS)){
+                return false;
+            }
+        }        
         if (shouldShieldBreak()) return stack.getItem() instanceof AxeItem;
         if (attackWhenHolding.get() == AttackItems.All) return true;
 
@@ -517,6 +756,22 @@ public class KillAura extends Module {
         Ignore,
         Break,
         None
+    }
+    public enum AnticheatMode {
+        MODE_onlyOnLook("onlyOnLook"),
+        MODE_3C3U("3C3U"),
+        MODE_any("any");
+
+        private final String title;
+
+        AnticheatMode(String title) {
+            this.title = title;
+        }
+
+        @Override
+        public String toString() {
+            return title;
+        }
     }
 
     public enum EntityAge {

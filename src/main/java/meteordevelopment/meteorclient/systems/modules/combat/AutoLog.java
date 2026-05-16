@@ -17,6 +17,8 @@ import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.meteorclient.systems.modules.misc.AutoReconnect;
 import meteordevelopment.meteorclient.utils.Utils;
+import meteordevelopment.meteorclient.utils.entity.SortPriority;
+import meteordevelopment.meteorclient.utils.entity.TargetUtils;
 import meteordevelopment.meteorclient.utils.entity.DamageUtils;
 import meteordevelopment.meteorclient.utils.player.PlayerUtils;
 import meteordevelopment.orbit.EventHandler;
@@ -27,29 +29,35 @@ import net.minecraft.network.protocol.common.ClientboundDisconnectPacket;
 import net.minecraft.network.protocol.game.ClientboundEntityEventPacket;
 import net.minecraft.util.CommonColors;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.EntityEvent;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.player.Player;
+import java.text.DecimalFormat;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Predicate;
 
 import java.util.Set;
 
 public class AutoLog extends Module {
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
     private final SettingGroup sgEntities = settings.createGroup("Entities");
-
+    static DecimalFormat healthFormat = new DecimalFormat("#.##");
+    static DecimalFormat coordsFormat = new DecimalFormat("#");
     private final Setting<Integer> health = sgGeneral.add(new IntSetting.Builder()
         .name("health")
-        .description("Automatically disconnects when health is lower or equal to this value. Set to 0 to disable.")
+        .description("Automatically disconnects when health is lower to this value. Set to 0 to disable.")
         .defaultValue(6)
-        .range(0, 19)
-        .sliderMax(19)
+        .range(0, 20)
+        .sliderMax(20)
         .build()
     );
 
     private final Setting<Boolean> smart = sgGeneral.add(new BoolSetting.Builder()
         .name("predict-incoming-damage")
         .description("Disconnects when it detects you're about to take enough damage to set you under the 'health' setting.")
-        .defaultValue(true)
+        .defaultValue(false)
         .build()
     );
 
@@ -58,6 +66,21 @@ public class AutoLog extends Module {
         .description("Disconnects when you have popped this many totems. Set to 0 to disable.")
         .defaultValue(0)
         .min(0)
+        .build()
+    );
+    private final Setting<Boolean> lowYprevent = sgGeneral.add(new BoolSetting.Builder()
+        .name("low-Y-prevent")
+        .description("Disconnects if player is about to fall into void. Useful in the end.")
+        .defaultValue(false)
+        .build()
+    );
+    private final Setting<Integer> lowYvalue = sgGeneral.add(new IntSetting.Builder()
+        .name("low-Y-value")
+        .description("At which height have to AutoLog.")
+        .defaultValue(30)
+        .sliderMin(-64)
+        .sliderMax(320)
+        .visible(lowYprevent::get)
         .build()
     );
 
@@ -97,11 +120,16 @@ public class AutoLog extends Module {
     );
 
     // Entities
-
+    private final Setting<Boolean> entitytrack = sgEntities.add(new BoolSetting.Builder()
+        .name("entitytrack")
+        .description("Track entity when disconnect.")
+        .defaultValue(false)
+        .build()
+    );
     private final Setting<Set<EntityType<?>>> entities = sgEntities.add(new EntityTypeListSetting.Builder()
         .name("entities")
         .description("Disconnects when a specified entity is present within a specified range.")
-        .defaultValue(EntityType.END_CRYSTAL)
+        .visible(entitytrack::get)
         .build()
     );
 
@@ -134,11 +162,20 @@ public class AutoLog extends Module {
 
     private final Setting<Integer> range = sgEntities.add(new IntSetting.Builder()
         .name("range")
-        .description("How close an entity has to be to you before you disconnect.")
+        .description("How close an entity has to be tracked in entitytrack.")
         .defaultValue(5)
         .min(1)
         .sliderMax(16)
-        .visible(() -> !entities.get().isEmpty())
+        .visible(entitytrack::get)
+        .build()
+    );
+    private final Setting<Integer> count = sgEntities.add(new IntSetting.Builder()
+        .name("count")
+        .description("How many entity has to be tracked in entitytrack.")
+        .defaultValue(5)
+        .min(1)
+        .sliderMax(10)
+        .visible(entitytrack::get)
         .build()
     );
 
@@ -178,8 +215,13 @@ public class AutoLog extends Module {
             this.toggle();
             return;
         }
-        if (playerHealth <= health.get()) {
-            disconnect("Health was lower than " + health.get() + ".");
+        if (lowYprevent.get()&& mc.player.getY()<lowYvalue.get()) {
+            disconnect("You were disconnected by Auto Logout due to low Y value.\n\n");
+            if (toggleOff.get()) this.toggle();
+            return;
+        }
+        if (playerHealth < health.get()) {
+            disconnect("You were disconnected by Auto Logout due to low health.\n\n");
             if (smartToggle.get()) {
                 if (isActive()) this.toggle();
                 enableHealthListener();
@@ -245,14 +287,33 @@ public class AutoLog extends Module {
         }
     }
 
-    private void disconnect(String reason) {
+    public void disconnect(String reason) {
         disconnect(Component.literal(reason));
+    }
+    private boolean EntityInrange(Entity target) {
+        Player player = mc.player;
+        if (player == null) return false;
+        if (target.equals(player) || target.equals(mc.getCameraEntity())) return false;
+        if ((target instanceof LivingEntity livingEntity && livingEntity.isDeadOrDying()) || !target.isAlive()) return false;
+        if(!target.isAttackable()) return false;
+        return PlayerUtils.isWithin(target, range.get());
     }
 
     private void disconnect(Component reason) {
         MutableComponent text = Component.literal("[AutoLog] ");
-        text.append(reason);
-
+        text.append(reason).withStyle(style -> style.withBold(true).withColor(ChatFormatting.GREEN));
+        float playerHealth = mc.player.getHealth();
+        text.append(Component.literal("Health: " + healthFormat.format(playerHealth) + " (≈" + Math.floor(playerHealth) / 2 + " Hearts)\n").withStyle(style -> style.withColor(ChatFormatting.GOLD)));
+        String playerX = coordsFormat.format(mc.player.getX() >= 0 ? Math.floor(mc.player.getX()) : Math.ceil(mc.player.getX()));
+        String playerY = coordsFormat.format(mc.player.getY() >= 0 ? Math.floor(mc.player.getY()) : Math.ceil(mc.player.getY()));
+        String playerZ = coordsFormat.format(mc.player.getZ() >= 0 ? Math.floor(mc.player.getZ()) : Math.ceil(mc.player.getZ()));
+        text.append(Component.literal(String.format("Coordinates: %s %s %s", playerX, playerY, playerZ)).withStyle(style -> style.withColor(ChatFormatting.GOLD)));
+        if (entitytrack.get()) {
+            List<Entity> targets = new ArrayList<>();
+            TargetUtils.getList(targets, this::EntityInrange, SortPriority.LowestDistance, count.get());
+            List<String> entityNames = targets.stream().map(entity -> entity instanceof Player ? entity.getName().getString() : entity.getType().getDescription().getString()).toList();
+            text.append(Component.literal("\nNearby Entities: " + String.join(", ", entityNames)).withStyle(style -> style.withColor(ChatFormatting.GOLD)));
+        }
         AutoReconnect autoReconnect = Modules.get().get(AutoReconnect.class);
         if (autoReconnect.isActive() && toggleAutoReconnect.get()) {
             text.append(Component.literal("\n\nINFO - AutoReconnect was disabled").withColor(CommonColors.GRAY));
